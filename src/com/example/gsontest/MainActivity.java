@@ -16,6 +16,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 // https://sites.google.com/site/gson/
 import com.google.gson.Gson;
 
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.StrictMode;
 import android.app.Activity;
@@ -32,64 +33,81 @@ public class MainActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-		
-		// We are doing a network request on the UI thread which is technically a no-no.  Changing the "ThreadPolicy" allows us to do it.
-		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-		StrictMode.setThreadPolicy(policy); 
-
-		// Here is the setup of our network request, we create an HttpClient and an HttpGet request object with the URL.
-		DefaultHttpClient client = new DefaultHttpClient();
-		HttpGet getRequest = new HttpGet(twitterURL);
-
-		try {
-		
-			// Once we execute the request, we get an HttpResponse
-			HttpResponse getResponse = client.execute(getRequest);
 			
-			// If the status is OK then we move on.
-			final int statusCode = getResponse.getStatusLine().getStatusCode();
-			if (statusCode == HttpStatus.SC_OK) { 
+		// Request the JSON and do the parsing in the background
+		RequestJSON request = new RequestJSON();
+		request.execute(new String[] { twitterURL });
+	}
+	
+	class RequestJSON extends AsyncTask<String, Void, String>
+	{
+
+		@Override
+		protected String doInBackground(String... urls) {
+			String jsonString = "";
+
+			// Here is the setup of our network request, we create an HttpClient and an HttpGet request object with the URL.
+			DefaultHttpClient client = new DefaultHttpClient();
+			HttpGet getRequest = new HttpGet(urls[0]);
+
+			try {
+			
+				// Once we execute the request, we get an HttpResponse
+				HttpResponse getResponse = client.execute(getRequest);
 				
-				// Get the content of the response as an InputStream and construct a reader
-        	   HttpEntity getResponseEntity = getResponse.getEntity();
-        	   InputStream inputStream = getResponseEntity.getContent();
-               
-               // Create a BufferedReader and StringBuilder to read form the stream and output a String
-               // Technically we could just hand gson the reader object but I thought this was a valuable example
-               BufferedReader bufferedreader = new BufferedReader(new InputStreamReader(inputStream));
-               StringBuilder stringbuilder = new StringBuilder();
-        
-               String currentline = null;
-               
-               try {
-                   while ((currentline = bufferedreader.readLine()) != null) {
-                   	stringbuilder.append(currentline + "\n");
-                   }
-               } catch (IOException e) {
-                   e.printStackTrace();
-               }
-               
-               // Here is the resulting string
-               String result = stringbuilder.toString();
-               //Log.v("HTTP REQUEST",result);
-               inputStream.close();               
-               
-               // Create the Gson object and pass in the JSON
-               // In this case, we are receiving an array and we want to cast it to an array of "TwitterFeed" objects
-               // See below for the definition of a "TwitterFeed"
-        	   Gson gson = new Gson();
-               TwitterFeed[] responses = gson.fromJson(result, TwitterFeed[].class);
-               
-               // Print out the results
-               for (int i = 0; i < responses.length; i++) {
-            	   Log.v(LOGTAG,responses[i].text);
-               }
-                      	   
-           }
-        } 
-        catch (IOException e) {
-        	e.printStackTrace();
+				// If the status is OK then we move on.
+				final int statusCode = getResponse.getStatusLine().getStatusCode();
+				if (statusCode == HttpStatus.SC_OK) { 
+					
+					// Get the content of the response as an InputStream and construct a reader
+	        	   HttpEntity getResponseEntity = getResponse.getEntity();
+	        	   InputStream inputStream = getResponseEntity.getContent();
+	               
+	               // Create a BufferedReader and StringBuilder to read form the stream and output a String
+	               // Technically we could just hand gson the reader object but I thought this was a valuable example
+	               BufferedReader bufferedreader = new BufferedReader(new InputStreamReader(inputStream));
+	               StringBuilder stringbuilder = new StringBuilder();
+	        
+	               String currentline = null;
+	               
+	               try {
+	                   while ((currentline = bufferedreader.readLine()) != null) {
+	                   	stringbuilder.append(currentline + "\n");
+	                   }
+	               } catch (IOException e) {
+	                   e.printStackTrace();
+	               }
+	               
+	               // Here is the resulting string
+	               jsonString = stringbuilder.toString();
+	               //Log.v("HTTP REQUEST",result);
+	               inputStream.close();  
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			return jsonString;
+		}
+		
+		@Override
+        protected void onProgressUpdate(Void... values) {
         }
+		
+		@Override
+        protected void onPostExecute(String result) {
+	       // Create the Gson object and pass in the JSON
+	       // In this case, we are receiving an array and we want to cast it to an array of "TwitterFeed" objects
+	       // See below for the definition of a "TwitterFeed"
+		   Gson gson = new Gson();
+	       TwitterFeed[] responses = gson.fromJson(result, TwitterFeed[].class);
+	       
+	       // Print out the results
+	       for (int i = 0; i < responses.length; i++) {
+	    	   Log.v(LOGTAG,responses[i].text);
+	       }
+        }
+		
 		
 	}
 	
